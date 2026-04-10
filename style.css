@@ -356,18 +356,19 @@ button {
 /* ── CM drop-line indicator ───────────────────────── */
 
 .cm-drop-line {
-  background: rgba(0, 229, 255, 0.08) !important;
   border-top: 2px solid var(--accent) !important;
   position: relative;
 }
+/* Small circle at the left edge — looks like a proper insertion-cursor marker */
 .cm-drop-line::before {
-  content: '▶';
+  content: '';
   position: absolute;
-  left: -2px;
-  top: -1px;
-  color: var(--accent);
-  font-size: 8px;
-  line-height: 1;
+  left: -4px;
+  top: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
 }
 
 /* ── Drag ghost card ──────────────────────────────── */

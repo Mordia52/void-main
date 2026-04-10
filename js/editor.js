@@ -96,7 +96,7 @@ const crucibleTheme = EditorView.theme({
   '::selection':           { backgroundColor: '#264f78' },
   '.cm-matchingBracket':  { color: '#00e5ff', fontWeight: 'bold', backgroundColor: 'rgba(0,229,255,0.15)' },
   '.cm-error-line':        { backgroundColor: 'rgba(255,85,85,0.18) !important' },
-  '.cm-drop-line':         { backgroundColor: 'rgba(0,229,255,0.07) !important', borderTop: '2px solid #00e5ff' },
+  '.cm-drop-line':         { borderTop: '2px solid #00e5ff !important' },
   // fold gutter
   '.cm-foldGutter .cm-gutterElement': { cursor: 'pointer', padding: '0 4px' },
   '.cm-foldPlaceholder': {
@@ -250,7 +250,10 @@ export function setDropLine(lineNum) {
  */
 export function lineAtCoords(x, y) {
   const pos = fragEditor.posAtCoords({ x, y }, false);
-  if (pos === null) return null;
+  // When mouse is in the empty space below the last line, posAtCoords returns
+  // null even though we're still inside the overlay. Snap to the last line so
+  // the user can always drop at the end of the file.
+  if (pos === null) return fragEditor.state.doc.lines;
   return fragEditor.state.doc.lineAt(pos).number;
 }
 
