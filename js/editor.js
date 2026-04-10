@@ -1,11 +1,17 @@
 import { EditorView, keymap, lineNumbers, drawSelection,
-         highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view';
+         highlightActiveLine, highlightActiveLineGutter,
+         highlightSpecialChars, dropCursor,
+         rectangularSelection, crosshairCursor,
+         Decoration }                                     from '@codemirror/view';
 import { EditorState, StateEffect, StateField, Transaction } from '@codemirror/state';
 import { defaultKeymap, indentWithTab, history, undo, redo } from '@codemirror/commands';
 import { StreamLanguage, syntaxHighlighting,
-         defaultHighlightStyle, bracketMatching,
-         indentOnInput }                                  from '@codemirror/language';
-import { Decoration }                                     from '@codemirror/view';
+         bracketMatching, indentOnInput,
+         foldGutter }                                     from '@codemirror/language';
+import { closeBrackets }                                  from '@codemirror/autocomplete';
+import { searchKeymap, highlightSelectionMatches,
+         selectNextOccurrence }                           from '@codemirror/search';
+import { oneDarkHighlightStyle }                          from '@codemirror/theme-one-dark';
 import { c as cLike }                                     from '@codemirror/legacy-modes/mode/clike';
 
 import { DEFAULT_FRAG, DEFAULT_VERT } from './presets.js';
@@ -65,11 +71,11 @@ const errorLineField = StateField.define({
   provide: f => EditorView.decorations.from(f),
 });
 
-// ── Dark theme ─────────────────────────────────────────
+// ── Dark theme (editor chrome only — syntax colors come from oneDarkHighlightStyle) ──
 const crucibleTheme = EditorView.theme({
   '&': {
     backgroundColor: '#111113',
-    color: '#e0e0f0',
+    color: '#abb2bf',
     height: '100%',
     fontSize: '13px',
     fontFamily: '"JetBrains Mono", "Fira Code", monospace',
@@ -87,32 +93,85 @@ const crucibleTheme = EditorView.theme({
   '.cm-lineNumbers .cm-gutterElement': { padding: '0 14px 0 8px' },
   '.cm-activeLineGutter': { backgroundColor: '#161619', color: '#6a6a80' },
   '.cm-activeLine':        { backgroundColor: '#161619' },
-  '.cm-selectionBackground, ::selection': { backgroundColor: '#1a3040' },
-  '&.cm-focused .cm-selectionBackground': { backgroundColor: '#1a3040' },
-  '.cm-matchingBracket':  { color: '#00e5ff', fontWeight: 'bold', backgroundColor: 'transparent' },
+  '.cm-selectionBackground':           { backgroundColor: '#1a3040' },
+  '&.cm-focused .cm-selectionBackground': { backgroundColor: '#264f78' },
+  '::selection':           { backgroundColor: '#264f78' },
+  '.cm-matchingBracket':  { color: '#00e5ff', fontWeight: 'bold', backgroundColor: 'rgba(0,229,255,0.15)' },
   '.cm-error-line':        { backgroundColor: 'rgba(255,85,85,0.18) !important' },
   '.cm-drop-line':         { backgroundColor: 'rgba(0,229,255,0.07) !important', borderTop: '2px solid #00e5ff' },
+  // fold gutter
+  '.cm-foldGutter .cm-gutterElement': { cursor: 'pointer', padding: '0 4px' },
+  '.cm-foldPlaceholder': {
+    backgroundColor: 'transparent',
+    border: '1px solid #3a3a50',
+    color: '#6a6a80',
+    borderRadius: '3px',
+    padding: '0 4px',
+    cursor: 'pointer',
+  },
+  // search panel
+  '.cm-searchMatch':         { backgroundColor: 'rgba(0,229,255,0.15)', outline: '1px solid rgba(0,229,255,0.4)' },
+  '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: 'rgba(0,229,255,0.35)' },
+  '.cm-panels':              { backgroundColor: '#111113', borderTop: '1px solid #2a2a35' },
+  '.cm-panels.cm-panels-top':{ borderBottom: '1px solid #2a2a35', borderTop: 'none' },
+  '.cm-panel.cm-search':     { padding: '6px 10px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' },
+  '.cm-panel.cm-search input[type="text"]': {
+    backgroundColor: '#1e1e24',
+    color: '#e0e0f0',
+    border: '1px solid #2a2a35',
+    borderRadius: '4px',
+    padding: '2px 7px',
+    fontSize: '12px',
+    outline: 'none',
+    fontFamily: '"JetBrains Mono", monospace',
+  },
+  '.cm-panel.cm-search input[type="text"]:focus': { borderColor: '#00e5ff' },
+  '.cm-panel.cm-search button': {
+    backgroundColor: '#1e1e24',
+    color: '#a0a0c0',
+    border: '1px solid #2a2a35',
+    borderRadius: '4px',
+    padding: '2px 8px',
+    fontSize: '11px',
+    cursor: 'pointer',
+  },
+  '.cm-panel.cm-search button:hover': { color: '#00e5ff', borderColor: '#00e5ff' },
+  '.cm-panel.cm-search label': { color: '#6a6a80', fontSize: '11px' },
+  // highlight selection matches
+  '.cm-selectionMatch': { backgroundColor: 'rgba(0,229,255,0.08)' },
+  // drop cursor
+  '.cm-dropCursor': { borderLeft: '2px solid #00e5ff' },
 }, { dark: true });
 
 // ── Editor factory ─────────────────────────────────────
 function makeEditor(doc, parent, fireOnChange = false) {
   const extensions = [
     lineNumbers(),
+    highlightSpecialChars(),
     highlightActiveLine(),
     highlightActiveLineGutter(),
     drawSelection(),
+    dropCursor(),
+    rectangularSelection(),
+    crosshairCursor(),
     bracketMatching(),
+    closeBrackets(),
     indentOnInput(),
+    foldGutter(),
     glslLang,
-    syntaxHighlighting(defaultHighlightStyle),
+    syntaxHighlighting(oneDarkHighlightStyle),
+    highlightSelectionMatches(),
     crucibleTheme,
     errorLineField,
     dropLineField,
+    EditorView.lineWrapping,
     history(),
     keymap.of([
       { key: 'Mod-z', run: undo, preventDefault: true },
       { key: 'Mod-y', run: redo, preventDefault: true },
+      { key: 'Mod-d', run: selectNextOccurrence, preventDefault: true },
       ...defaultKeymap,
+      ...searchKeymap,
       indentWithTab,
     ]),
   ];
@@ -205,7 +264,6 @@ export function lineAtCoords(x, y) {
 
 /**
  * Insert text at the current cursor position in the fragment editor.
- * If prependNewline is true, ensures the text starts on its own line.
  */
 export function insertAtCursor(text, prependNewline = true) {
   const { state } = fragEditor;
@@ -223,8 +281,8 @@ export function insertAtCursor(text, prependNewline = true) {
 }
 
 /**
- * Insert text at a specific 1-based line number in the fragment editor.
- * Ensures clean newlines around the inserted block.
+ * Insert text at a specific 1-based line number.
+ * Ensures a blank line above and below the inserted block.
  */
 export function insertAtLine(lineNum, text) {
   const { state } = fragEditor;
@@ -234,25 +292,67 @@ export function insertAtLine(lineNum, text) {
   } catch {
     pos = state.doc.length;
   }
-  const before     = pos > 0 ? state.sliceDoc(pos - 1, pos) : '\n';
-  const leadNewline = before !== '\n' ? '\n' : '';
-  const insert      = leadNewline + text.trim() + '\n\n';
+
+  // Ensure a blank line above: check the two chars before insertion point
+  const twoBefore = pos >= 2 ? state.sliceDoc(pos - 2, pos) : state.sliceDoc(0, pos);
+  let lead;
+  if (pos === 0 || twoBefore === '\n\n') {
+    lead = '';       // already a blank line above
+  } else if (twoBefore.endsWith('\n')) {
+    lead = '\n';     // one newline exists → add one more
+  } else {
+    lead = '\n\n';   // no newline → add two
+  }
+
+  // Ensure a blank line below: check the two chars after insertion point
+  const twoAfter = state.sliceDoc(pos, Math.min(pos + 2, state.doc.length));
+  let trail;
+  if (twoAfter.startsWith('\n\n')) {
+    trail = '';
+  } else if (twoAfter.startsWith('\n')) {
+    trail = '\n';
+  } else {
+    trail = '\n\n';
+  }
+
+  const insert = lead + text.trim() + trail;
   fragEditor.dispatch({ changes: { from: pos, insert } });
   fragEditor.focus();
 }
 
 /**
- * Prepend text just before void main(). Good for inserting helper functions.
- * Ensures clean newlines so code never concatenates with adjacent lines.
+ * Prepend text just before void main().
+ * Ensures a blank line above and below the inserted block.
  */
 export function prependBeforeMain(text) {
   const src    = fragEditor.state.doc.toString();
   const mainRe = /^void\s+main\s*\(/m;
   const match  = mainRe.exec(src);
   const pos    = match ? match.index : src.length;
-  const before     = pos > 0 ? src[pos - 1] : '\n';
-  const leadNewline = before !== '\n' ? '\n' : '';
-  const insert = leadNewline + text.trim() + '\n\n';
+
+  // Ensure a blank line above
+  const twoBefore = pos >= 2 ? src.slice(pos - 2, pos) : src.slice(0, pos);
+  let lead;
+  if (pos === 0 || twoBefore === '\n\n') {
+    lead = '';
+  } else if (twoBefore.endsWith('\n')) {
+    lead = '\n';
+  } else {
+    lead = '\n\n';
+  }
+
+  // Ensure a blank line below
+  const twoAfter = src.slice(pos, pos + 2);
+  let trail;
+  if (twoAfter.startsWith('\n\n')) {
+    trail = '';
+  } else if (twoAfter.startsWith('\n')) {
+    trail = '\n';
+  } else {
+    trail = '\n\n';
+  }
+
+  const insert = lead + text.trim() + trail;
   fragEditor.dispatch({ changes: { from: pos, insert } });
   fragEditor.focus();
 }
