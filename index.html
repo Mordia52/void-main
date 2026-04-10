@@ -54,7 +54,6 @@
       </select>
       <button id="compile-btn"         class="btn-primary">Compile ▶</button>
       <button id="reset-camera-btn"    class="btn-secondary">Reset</button>
-      <button id="toggle-uniforms-btn" class="btn-secondary">Uniforms</button>
     </div>
   </div>
 
@@ -78,17 +77,84 @@
 
     <div id="divider"></div>
 
-    <!-- Right: canvas + uniform sidebar -->
+    <!-- Right: canvas + tabbed sidebar -->
     <div id="canvas-pane">
       <canvas id="gl-canvas"></canvas>
-      <div id="uniform-sidebar">
-        <div class="sidebar-header">Uniforms</div>
-        <div id="uniform-controls">
-          <p class="sidebar-hint">Compile a shader to auto-detect uniforms.</p>
+      <div id="right-sidebar">
+        <div class="sidebar-tabs">
+          <button class="sidebar-tab active" data-sidebar="uniforms">Uniforms</button>
+          <button class="sidebar-tab"        data-sidebar="patterns">Patterns</button>
+        </div>
+
+        <!-- Uniforms panel -->
+        <div id="uniform-sidebar" class="sidebar-panel">
+          <div id="uniform-controls">
+            <p class="sidebar-hint">Compile a shader to auto-detect uniforms.</p>
+          </div>
+        </div>
+
+        <!-- Patterns panel -->
+        <div id="pattern-sidebar" class="sidebar-panel hidden">
+          <div class="pattern-toolbar">
+            <input id="pattern-search" type="text" placeholder="Search patterns…" autocomplete="off" />
+            <select id="pattern-category-filter">
+              <option value="">All categories</option>
+            </select>
+            <button id="extract-pattern-btn" class="btn-secondary" title="Extract selection as Pattern (Ctrl+E)">+ Extract</button>
+          </div>
+          <div id="pattern-list"></div>
         </div>
       </div>
     </div>
 
+  </div>
+
+  <!-- ── Extract Pattern modal ──────────────────────────── -->
+  <div id="extract-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Save Pattern">
+    <div class="modal-backdrop"></div>
+    <div class="modal-panel modal-panel--sm">
+      <div class="modal-header">
+        <span class="modal-title">Save Pattern</span>
+        <button class="modal-close" id="extract-modal-close">✕</button>
+      </div>
+      <div class="extract-form">
+        <label class="form-label">Name
+          <input id="extract-name" type="text" class="form-input" placeholder="e.g. sdCapsule" autocomplete="off" />
+        </label>
+        <label class="form-label">Category
+          <select id="extract-category" class="form-input"></select>
+        </label>
+        <label class="form-label">Description <span class="form-hint">(optional)</span>
+          <input id="extract-desc" type="text" class="form-input" placeholder="What does this do?" autocomplete="off" />
+        </label>
+        <label class="form-label">Code preview
+          <pre id="extract-preview" class="code-preview"></pre>
+        </label>
+        <div class="extract-actions">
+          <button id="extract-cancel-btn" class="btn-secondary">Cancel</button>
+          <button id="extract-save-btn"   class="btn-primary">Save to Library</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Dep insert modal ─────────────────────────────── -->
+  <div id="dep-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Missing Dependencies">
+    <div class="modal-backdrop"></div>
+    <div class="modal-panel modal-panel--sm">
+      <div class="modal-header">
+        <span class="modal-title">Missing Dependencies</span>
+        <button class="modal-close" id="dep-modal-close">✕</button>
+      </div>
+      <div class="dep-body">
+        <p class="sidebar-hint">This pattern requires the following helpers that aren't in your shader yet:</p>
+        <ul id="dep-list"></ul>
+        <div class="extract-actions">
+          <button id="dep-skip-btn"   class="btn-secondary">Insert without deps</button>
+          <button id="dep-insert-btn" class="btn-primary">Insert all</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ── Project modal ───────────────────────────────── -->

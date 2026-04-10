@@ -137,3 +137,43 @@ export function clearErrors() {
     effects: setErrorLineEffect.of(null),
   });
 }
+
+/** Return the currently selected text in the fragment editor, or '' if nothing selected. */
+export function getSelection() {
+  const { state } = fragEditor;
+  const sel = state.selection.main;
+  return sel.empty ? '' : state.sliceDoc(sel.from, sel.to);
+}
+
+/**
+ * Insert text at the current cursor position in the fragment editor.
+ * If prependNewline is true, ensures the text starts on its own line.
+ */
+export function insertAtCursor(text, prependNewline = true) {
+  const { state } = fragEditor;
+  const pos  = state.selection.main.head;
+  const line = state.doc.lineAt(pos);
+  const atLineStart = line.text.trim() === '' || pos === line.from;
+
+  const insert = prependNewline && !atLineStart ? '\n' + text : text;
+
+  fragEditor.dispatch({
+    changes: { from: pos, insert },
+    selection: { anchor: pos + insert.length },
+  });
+  fragEditor.focus();
+}
+
+/**
+ * Prepend text before the first non-uniform, non-whitespace line
+ * (i.e. just before void main). Good for inserting helper functions.
+ */
+export function prependBeforeMain(text) {
+  const src    = fragEditor.state.doc.toString();
+  const mainRe = /^void\s+main\s*\(/m;
+  const match  = mainRe.exec(src);
+  const pos    = match ? match.index : 0;
+  const insert = text + '\n\n';
+  fragEditor.dispatch({ changes: { from: pos, insert } });
+  fragEditor.focus();
+}
