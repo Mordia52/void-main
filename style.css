@@ -285,6 +285,123 @@ button {
 }
 #gl-canvas.flash { animation: errorFlash 0.4s ease; }
 
+/* ── Uniform controls ─────────────────────────────── */
+
+.uniform-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid #1e1e26;
+}
+.uniform-row:last-child { border-bottom: none; }
+
+.uniform-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  min-width: 90px;
+  padding-top: 3px;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.uniform-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.uniform-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.uniform-slider::-webkit-slider-thumb:hover { background: var(--accent-dim); }
+
+.uniform-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 38px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Toggle */
+.toggle-label {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 18px;
+  cursor: pointer;
+}
+.uniform-toggle { display: none; }
+.toggle-knob {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 9px;
+  transition: background 0.15s;
+}
+.toggle-knob::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.15s, background 0.15s;
+}
+.uniform-toggle:checked + .toggle-knob { background: var(--accent); }
+.uniform-toggle:checked + .toggle-knob::after {
+  transform: translateX(16px);
+  background: #000;
+}
+
+/* Color picker */
+.color-wrap { display: flex; align-items: center; }
+.uniform-color {
+  width: 36px;
+  height: 24px;
+  padding: 1px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Vec sliders */
+.vec-sliders { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.vec-sub     { display: flex; align-items: center; gap: 6px; }
+.vec-label   {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  width: 10px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
 /* ── Utility ──────────────────────────────────────── */
 
 .hidden { display: none !important; }

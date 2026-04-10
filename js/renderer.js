@@ -1,7 +1,12 @@
 import * as THREE from 'three';
 
 let scene, camera, renderer, mesh;
-let rafId;
+let t0 = 0;
+let frameCount = 0;
+
+// Built-in uniforms — shared by reference with any active ShaderMaterial.
+// Updating .value here is immediately visible to the GPU next frame.
+let builtinUniforms;
 
 const GEOMETRIES = {
   quad:   () => new THREE.PlaneGeometry(2, 2),
@@ -21,24 +26,67 @@ export function initRenderer(canvasEl) {
   renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
+  builtinUniforms = {
+    iTime:       { value: 0.0 },
+    iResolution: { value: new THREE.Vector2(1, 1) },
+    iMouse:      { value: new THREE.Vector2(0, 0) },
+    iFrame:      { value: 0 },
+  };
+
   resize();
 
-  // Placeholder: rotating box with MeshNormalMaterial
   mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(1.3, 1.3, 1.3),
+    GEOMETRIES.box(),
     new THREE.MeshNormalMaterial(),
   );
   scene.add(mesh);
 
-  const t0 = performance.now();
-  function loop() {
-    rafId = requestAnimationFrame(loop);
-    const t = (performance.now() - t0) * 0.001;
+  t0 = performance.now();
+  loop();
+}
+
+function loop() {
+  requestAnimationFrame(loop);
+  const t = (performance.now() - t0) * 0.001;
+
+  if (mesh.material.isShaderMaterial) {
+    const canvas = renderer.domElement;
+    builtinUniforms.iTime.value       = t;
+    builtinUniforms.iFrame.value      = frameCount;
+    builtinUniforms.iResolution.value.set(canvas.clientWidth, canvas.clientHeight);
+  } else {
+    // Placeholder rotation
     mesh.rotation.x = t * 0.38;
     mesh.rotation.y = t * 0.65;
-    renderer.render(scene, camera);
   }
-  loop();
+
+  frameCount++;
+  renderer.render(scene, camera);
+}
+
+// ── Public API ─────────────────────────────────────────
+
+export function setMaterial(material) {
+  if (mesh.material !== material) {
+    if (mesh.material.isShaderMaterial) mesh.material.dispose();
+    mesh.material = material;
+  }
+  // Reset rotation so vertex shaders get clean transforms
+  mesh.rotation.set(0, 0, 0);
+}
+
+export function restorePlaceholder() {
+  if (mesh.material.isShaderMaterial) mesh.material.dispose();
+  mesh.material = new THREE.MeshNormalMaterial();
+}
+
+export function getBuiltinUniforms() { return builtinUniforms; }
+export function getGLContext()       { return renderer.getContext(); }
+export function getScene()           { return scene; }
+export function getCamera()          { return camera; }
+
+export function setMousePos(x, y) {
+  if (builtinUniforms) builtinUniforms.iMouse.value.set(x, y);
 }
 
 export function resize() {
@@ -58,7 +106,7 @@ export function resetCamera() {
 
 export function setGeometry(type) {
   const factory = GEOMETRIES[type];
-  if (!factory || !mesh) return;
+  if (!factory) return;
   mesh.geometry.dispose();
   mesh.geometry = factory();
 }

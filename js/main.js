@@ -1,18 +1,91 @@
-import { initRenderer, resize as rendererResize, resetCamera, setGeometry } from './renderer.js';
+import { initRenderer, resize as rendererResize, resetCamera,
+         setGeometry, setMaterial, setMousePos,
+         getBuiltinUniforms, getGLContext }             from './renderer.js';
 import { initEditor, getFragmentSource, getVertexSource,
-         setFragmentSource, setVertexSource }                                from './editor.js';
-import { PRESETS }                                                           from './presets.js';
+         setFragmentSource, setVertexSource,
+         showError, clearErrors }                        from './editor.js';
+import { compile, extractUniforms }                     from './compiler.js';
+import { buildThreeUniforms, buildControls }            from './uniforms.js';
+import { PRESETS }                                      from './presets.js';
 
-// ── Bootstrap ──────────────────────────────────────
+// ── Bootstrap ──────────────────────────────────────────
 
-const canvas      = document.getElementById('gl-canvas');
-const fragHost    = document.getElementById('cm-fragment');
-const vertHost    = document.getElementById('cm-vertex');
+const canvas         = document.getElementById('gl-canvas');
+const fragHost       = document.getElementById('cm-fragment');
+const vertHost       = document.getElementById('cm-vertex');
+const errorPanel     = document.getElementById('error-panel');
+const errorContent   = document.getElementById('error-content');
+const uniformControls = document.getElementById('uniform-controls');
 
 initRenderer(canvas);
 initEditor({ fragContainer: fragHost, vertContainer: vertHost });
 
-// ── Tabs ───────────────────────────────────────────
+// ── Compile pipeline ───────────────────────────────────
+
+function doCompile() {
+  clearErrors();
+
+  const fragSrc = getFragmentSource();
+  const vertSrc = getVertexSource();
+
+  // Extract and build Three.js uniform objects for custom uniforms
+  const detected    = extractUniforms(fragSrc);
+  const userUniforms = buildThreeUniforms(detected);
+
+  const result = compile({
+    fragSrc,
+    vertSrc,
+    builtinUniforms: getBuiltinUniforms(),
+    userUniforms,
+    gl: getGLContext(),
+  });
+
+  if (!result.ok) {
+    showError(result.errorLine);
+    errorContent.textContent = result.error;
+    errorPanel.classList.remove('hidden');
+    flashCanvas();
+    return;
+  }
+
+  // Success
+  errorPanel.classList.add('hidden');
+  setMaterial(result.material);
+
+  // Build sidebar controls, wired live to material.uniforms
+  buildControls(detected, result.material.uniforms, uniformControls);
+}
+
+document.getElementById('compile-btn').addEventListener('click', doCompile);
+
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    doCompile();
+  }
+});
+
+// ── Canvas error flash ─────────────────────────────────
+
+function flashCanvas() {
+  canvas.classList.remove('flash');
+  requestAnimationFrame(() => canvas.classList.add('flash'));
+  canvas.addEventListener('animationend', () => canvas.classList.remove('flash'), { once: true });
+}
+
+// ── iMouse ─────────────────────────────────────────────
+
+canvas.addEventListener('mousemove', e => {
+  if (e.buttons === 0) return;
+  const rect = canvas.getBoundingClientRect();
+  // Flip Y so origin is bottom-left (matches GLSL convention)
+  setMousePos(
+    e.clientX - rect.left,
+    canvas.clientHeight - (e.clientY - rect.top),
+  );
+});
+
+// ── Tabs ───────────────────────────────────────────────
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -24,13 +97,13 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-// ── Geometry switcher ──────────────────────────────
+// ── Geometry switcher ──────────────────────────────────
 
 document.getElementById('geometry-select').addEventListener('change', e => {
   setGeometry(e.target.value);
 });
 
-// ── Preset dropdown ────────────────────────────────
+// ── Preset dropdown ────────────────────────────────────
 
 const presetSelect = document.getElementById('preset-select');
 PRESETS.forEach(p => {
@@ -43,47 +116,32 @@ PRESETS.forEach(p => {
 presetSelect.addEventListener('change', e => {
   const preset = PRESETS.find(p => p.name === e.target.value);
   if (!preset) return;
+  clearErrors();
+  errorPanel.classList.add('hidden');
   setFragmentSource(preset.frag);
   if (preset.vert) setVertexSource(preset.vert);
-  presetSelect.value = ''; // reset so same preset can be re-selected
+  presetSelect.value = '';
+  doCompile();
 });
 
-// ── Compile ────────────────────────────────────────
-
-function compile() {
-  // TODO: wire compiler.js — for now just log source lengths
-  const frag = getFragmentSource();
-  const vert = getVertexSource();
-  console.log(`[Crucible] compile — frag: ${frag.length} chars, vert: ${vert.length} chars`);
-}
-
-document.getElementById('compile-btn').addEventListener('click', compile);
-
-document.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-    e.preventDefault();
-    compile();
-  }
-});
-
-// ── Reset camera ───────────────────────────────────
+// ── Reset camera ───────────────────────────────────────
 
 document.getElementById('reset-camera-btn').addEventListener('click', resetCamera);
 
-// ── Toggle uniform sidebar ─────────────────────────
+// ── Toggle uniform sidebar ─────────────────────────────
 
 document.getElementById('toggle-uniforms-btn').addEventListener('click', () => {
   document.getElementById('uniform-sidebar').classList.toggle('hidden');
   rendererResize();
 });
 
-// ── Error panel ────────────────────────────────────
+// ── Error panel close ──────────────────────────────────
 
 document.getElementById('close-error-btn').addEventListener('click', () => {
-  document.getElementById('error-panel').classList.add('hidden');
+  errorPanel.classList.add('hidden');
 });
 
-// ── Split-pane drag ────────────────────────────────
+// ── Split-pane drag ────────────────────────────────────
 
 (function initSplitPane() {
   const divider    = document.getElementById('divider');
@@ -120,6 +178,6 @@ document.getElementById('close-error-btn').addEventListener('click', () => {
   });
 })();
 
-// ── Canvas resize observer ─────────────────────────
+// ── Canvas resize observer ─────────────────────────────
 
 new ResizeObserver(rendererResize).observe(canvas);

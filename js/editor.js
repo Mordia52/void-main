@@ -1,18 +1,46 @@
 import { EditorView, keymap, lineNumbers, drawSelection,
          highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view';
-import { EditorState }                                    from '@codemirror/state';
+import { EditorState, StateEffect, StateField }          from '@codemirror/state';
 import { defaultKeymap, indentWithTab }                   from '@codemirror/commands';
 import { StreamLanguage, syntaxHighlighting,
          defaultHighlightStyle, bracketMatching,
          indentOnInput }                                  from '@codemirror/language';
+import { Decoration }                                     from '@codemirror/view';
 import { c as cLike }                                     from '@codemirror/legacy-modes/mode/clike';
 
 import { DEFAULT_FRAG, DEFAULT_VERT } from './presets.js';
 
-// ── GLSL language (C-like) ─────────────────────────
+// ── GLSL language ──────────────────────────────────────
 const glslLang = StreamLanguage.define(cLike);
 
-// ── Dark theme matching app palette ───────────────
+// ── Error line decoration ──────────────────────────────
+const setErrorLineEffect = StateEffect.define();
+
+const errorLineField = StateField.define({
+  create: () => Decoration.none,
+  update(decs, tr) {
+    decs = decs.map(tr.changes);
+    for (const e of tr.effects) {
+      if (!e.is(setErrorLineEffect)) continue;
+      if (e.value === null) {
+        decs = Decoration.none;
+      } else {
+        try {
+          const line = tr.state.doc.line(e.value);
+          decs = Decoration.set([
+            Decoration.line({ class: 'cm-error-line' }).range(line.from),
+          ]);
+        } catch {
+          decs = Decoration.none;
+        }
+      }
+    }
+    return decs;
+  },
+  provide: f => EditorView.decorations.from(f),
+});
+
+// ── Dark theme ─────────────────────────────────────────
 const crucibleTheme = EditorView.theme({
   '&': {
     backgroundColor: '#111113',
@@ -36,10 +64,11 @@ const crucibleTheme = EditorView.theme({
   '.cm-activeLine':        { backgroundColor: '#161619' },
   '.cm-selectionBackground, ::selection': { backgroundColor: '#1a3040' },
   '&.cm-focused .cm-selectionBackground': { backgroundColor: '#1a3040' },
-  '.cm-matchingBracket': { color: '#00e5ff', fontWeight: 'bold', backgroundColor: 'transparent' },
+  '.cm-matchingBracket':  { color: '#00e5ff', fontWeight: 'bold', backgroundColor: 'transparent' },
+  '.cm-error-line':        { backgroundColor: 'rgba(255,85,85,0.18) !important' },
 }, { dark: true });
 
-// ── Editor factory ─────────────────────────────────
+// ── Editor factory ─────────────────────────────────────
 function makeEditor(doc, parent) {
   return new EditorView({
     state: EditorState.create({
@@ -54,6 +83,7 @@ function makeEditor(doc, parent) {
         glslLang,
         syntaxHighlighting(defaultHighlightStyle),
         crucibleTheme,
+        errorLineField,
         keymap.of([...defaultKeymap, indentWithTab]),
       ],
     }),
@@ -68,13 +98,8 @@ export function initEditor({ fragContainer, vertContainer }) {
   vertEditor = makeEditor(DEFAULT_VERT, vertContainer);
 }
 
-export function getFragmentSource() {
-  return fragEditor.state.doc.toString();
-}
-
-export function getVertexSource() {
-  return vertEditor.state.doc.toString();
-}
+export function getFragmentSource() { return fragEditor.state.doc.toString(); }
+export function getVertexSource()   { return vertEditor.state.doc.toString(); }
 
 export function setFragmentSource(src) {
   fragEditor.dispatch({
@@ -88,6 +113,18 @@ export function setVertexSource(src) {
   });
 }
 
-// Stubs — wired up when compiler.js is integrated
-export function showError(_message) {}
-export function clearErrors() {}
+/**
+ * Highlight error line in the fragment editor (1-based line number).
+ * Pass null to clear.
+ */
+export function showError(lineNum) {
+  fragEditor.dispatch({
+    effects: setErrorLineEffect.of(lineNum ?? null),
+  });
+}
+
+export function clearErrors() {
+  fragEditor.dispatch({
+    effects: setErrorLineEffect.of(null),
+  });
+}
