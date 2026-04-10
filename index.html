@@ -46,6 +46,7 @@
 
     <div class="toolbar-right">
       <button id="patterns-btn" class="btn-secondary" title="Pattern Library (Ctrl+L)">◧ Patterns</button>
+      <button id="history-btn"  class="btn-secondary" title="Compile History (Ctrl+Shift+Z)">◎ History</button>
       <select id="geometry-select">
         <option value="quad">Fullscreen Quad</option>
         <option value="sphere">Sphere</option>
@@ -78,18 +79,42 @@
       <div class="drawer-drop-hint">Drop zone — drag a card into the editor</div>
     </div>
 
-    <!-- Left: editor + error panel -->
+    <!-- Left: editor + bottom panel -->
     <div id="editor-pane">
       <div id="editor-container">
         <div id="cm-fragment" class="cm-host"></div>
         <div id="cm-vertex"   class="cm-host hidden"></div>
-      </div>
-      <div id="error-panel" class="hidden">
-        <div class="error-header">
-          <span>Errors</span>
-          <button id="close-error-btn">✕</button>
+
+        <!-- History ghost overlay — previews a past compile without touching the live editor -->
+        <div id="history-ghost" class="hidden">
+          <div class="ghost-banner">
+            <span class="ghost-label">Previewing past compile</span>
+            <span id="ghost-timestamp" class="ghost-ts"></span>
+            <div class="ghost-actions">
+              <button id="ghost-restore-btn" class="btn-primary">Restore</button>
+              <button id="ghost-close-btn"   class="btn-secondary">✕ Back to live</button>
+            </div>
+          </div>
+          <pre id="ghost-source" class="ghost-source"></pre>
         </div>
-        <pre id="error-content"></pre>
+      </div>
+
+      <!-- Bottom panel: Errors | History (tabbed) -->
+      <div id="bottom-panel" class="hidden">
+        <div class="bottom-panel-header">
+          <div class="bottom-tabs">
+            <button class="bottom-tab-btn active" data-panel="errors">Errors</button>
+            <button class="bottom-tab-btn"        data-panel="history">History</button>
+          </div>
+          <button id="close-bottom-panel" class="bottom-panel-close" title="Close">✕</button>
+        </div>
+        <div id="errors-panel-body">
+          <pre id="error-content"></pre>
+        </div>
+        <div id="history-panel-body" class="hidden">
+          <div id="history-filmstrip"></div>
+          <p id="history-empty" class="history-empty hidden">No compile history yet — hit Compile to start recording.</p>
+        </div>
       </div>
     </div>
 
@@ -106,7 +131,7 @@
       </div>
     </div>
 
-  </div>
+  </div><!-- /#workspace -->
 
   <!-- ── Extract Pattern modal ──────────────────────────── -->
   <div id="extract-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Save Pattern">

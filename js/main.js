@@ -15,14 +15,13 @@ import { initProjects, setDefaults, getActive, getAll,
          projectColor, relativeTime }                            from './projects.js';
 import { initPatterns, getPatterns, savePattern, deletePattern,
          incrementUsed, missingDeps, CATEGORIES }               from './patterns.js';
+import { pushHistory, getHistory, clearHistory }                 from './history.js';
 
 // ── DOM refs ───────────────────────────────────────────
 
 const canvas          = document.getElementById('gl-canvas');
 const fragHost        = document.getElementById('cm-fragment');
 const vertHost        = document.getElementById('cm-vertex');
-const errorPanel      = document.getElementById('error-panel');
-const errorContent    = document.getElementById('error-content');
 const uniformControls = document.getElementById('uniform-controls');
 const projectModal    = document.getElementById('project-modal');
 const projectGrid     = document.getElementById('project-grid');
@@ -33,6 +32,21 @@ const patternCatFilter = document.getElementById('pattern-category-filter');
 const patternDrawer    = document.getElementById('pattern-drawer');
 const extractModal     = document.getElementById('extract-modal');
 const depModal         = document.getElementById('dep-modal');
+
+// Bottom panel
+const bottomPanel        = document.getElementById('bottom-panel');
+const errorContent       = document.getElementById('error-content');
+const errorsBody         = document.getElementById('errors-panel-body');
+const historyBody        = document.getElementById('history-panel-body');
+const historyFilmstrip   = document.getElementById('history-filmstrip');
+const historyEmpty       = document.getElementById('history-empty');
+
+// History ghost overlay
+const historyGhost       = document.getElementById('history-ghost');
+const ghostTimestamp     = document.getElementById('ghost-timestamp');
+const ghostSource        = document.getElementById('ghost-source');
+const ghostRestoreBtn    = document.getElementById('ghost-restore-btn');
+const ghostCloseBtn      = document.getElementById('ghost-close-btn');
 
 // ── State ──────────────────────────────────────────────
 
@@ -68,7 +82,9 @@ function loadProject(p) {
   geoSelect.value = currentGeometry;
   setGeometry(currentGeometry);
   clearErrors();
-  errorPanel.classList.add('hidden');
+  // Close ghost and error panel on project switch
+  hideHistoryGhost();
+  closeBottomPanel();
   doCompile();
 }
 
@@ -94,30 +110,40 @@ function doCompile() {
   if (!result.ok) {
     showError(result.errorLine);
     errorContent.textContent = result.error;
-    errorPanel.classList.remove('hidden');
+    openBottomPanel('errors');
     flashCanvas();
     return;
   }
 
-  errorPanel.classList.add('hidden');
+  // Close errors tab if it was open for errors; leave panel open if user is on history tab
+  if (bottomPanel.dataset.activeTab === 'errors') closeBottomPanel();
+
   setMaterial(result.material);
   buildControls(detected, result.material.uniforms, uniformControls);
 
   // Capture thumbnail after two frames so the new shader has rendered
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    autoSave({
-      frag:      fragSrc,
-      vert:      vertSrc,
-      geometry:  currentGeometry,
-      thumbnail: captureThumb(),
-    });
-    renderProjectGrid(); // refresh cards if modal is open
+    const thumb = captureThumb();
+    autoSave({ frag: fragSrc, vert: vertSrc, geometry: currentGeometry, thumbnail: thumb });
+    pushHistory(getActive().id, { frag: fragSrc, vert: vertSrc, thumbnail: thumb });
+    renderProjectGrid();
+    renderHistoryFilmstrip(); // refresh if panel is open
   }));
 }
 
 document.getElementById('compile-btn').addEventListener('click', doCompile);
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); doCompile(); }
+
+  // Ctrl+Shift+Z — step backward through compile history
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Z') {
+    e.preventDefault();
+    const entries = getHistory(getActive().id);
+    if (entries.length === 0) return;
+    const next = activeGhostIndex < entries.length - 1 ? activeGhostIndex + 1 : 0;
+    openBottomPanel('history');
+    showHistoryGhost(entries[next], next);
+  }
 });
 
 // ── Thumbnail ──────────────────────────────────────────
@@ -197,10 +223,115 @@ document.getElementById('reset-camera-btn').addEventListener('click', resetCamer
 
 // uniform sidebar toggle removed — now controlled by sidebar tabs
 
-// ── Error panel close ──────────────────────────────────
+// ── Bottom panel ───────────────────────────────────────
 
-document.getElementById('close-error-btn').addEventListener('click', () => {
-  errorPanel.classList.add('hidden');
+function openBottomPanel(tab = 'errors') {
+  bottomPanel.classList.remove('hidden');
+  switchBottomTab(tab);
+}
+
+function closeBottomPanel() {
+  bottomPanel.classList.add('hidden');
+  bottomPanel.dataset.activeTab = '';
+}
+
+function switchBottomTab(tab) {
+  bottomPanel.dataset.activeTab = tab;
+  document.querySelectorAll('.bottom-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.panel === tab);
+  });
+  errorsBody.classList.toggle('hidden', tab !== 'errors');
+  historyBody.classList.toggle('hidden', tab !== 'history');
+  if (tab === 'history') renderHistoryFilmstrip();
+}
+
+document.getElementById('close-bottom-panel').addEventListener('click', closeBottomPanel);
+
+document.querySelectorAll('.bottom-tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchBottomTab(btn.dataset.panel));
+});
+
+// ── History toolbar button ──────────────────────────────
+
+document.getElementById('history-btn').addEventListener('click', () => {
+  if (!bottomPanel.classList.contains('hidden') && bottomPanel.dataset.activeTab === 'history') {
+    closeBottomPanel();
+  } else {
+    openBottomPanel('history');
+  }
+});
+
+// ── History filmstrip ───────────────────────────────────
+
+let activeGhostIndex = -1;
+
+function renderHistoryFilmstrip() {
+  const entries = getHistory(getActive().id);
+  historyFilmstrip.innerHTML = '';
+
+  if (entries.length === 0) {
+    historyEmpty.classList.remove('hidden');
+    return;
+  }
+  historyEmpty.classList.add('hidden');
+
+  entries.forEach((entry, i) => {
+    const card = document.createElement('div');
+    card.className = 'history-card' + (i === activeGhostIndex ? ' ghost-active' : '');
+    card.title = new Date(entry.timestamp).toLocaleString();
+
+    const index = document.createElement('span');
+    index.className   = 'history-card-index';
+    index.textContent = i === 0 ? 'latest' : `−${i}`;
+
+    if (entry.thumbnail) {
+      const img = document.createElement('img');
+      img.className = 'history-thumb';
+      img.src = entry.thumbnail;
+      img.alt = '';
+      card.appendChild(img);
+    } else {
+      const ph = document.createElement('div');
+      ph.className = 'history-thumb-placeholder';
+      card.appendChild(ph);
+    }
+
+    const label = document.createElement('div');
+    label.className   = 'history-card-label';
+    label.textContent = relativeTime(entry.timestamp);
+
+    card.append(index, label);
+    card.addEventListener('click', () => showHistoryGhost(entry, i));
+    historyFilmstrip.appendChild(card);
+  });
+}
+
+// ── History ghost overlay ───────────────────────────────
+
+function showHistoryGhost(entry, index) {
+  activeGhostIndex = index;
+  ghostTimestamp.textContent = new Date(entry.timestamp).toLocaleString();
+  ghostSource.textContent = entry.frag;
+  historyGhost.classList.remove('hidden');
+  renderHistoryFilmstrip(); // update active card highlight
+}
+
+function hideHistoryGhost() {
+  historyGhost.classList.add('hidden');
+  activeGhostIndex = -1;
+  renderHistoryFilmstrip();
+}
+
+ghostCloseBtn.addEventListener('click', hideHistoryGhost);
+
+ghostRestoreBtn.addEventListener('click', () => {
+  const entries = getHistory(getActive().id);
+  const entry   = entries[activeGhostIndex];
+  if (!entry) return;
+  hideHistoryGhost();
+  setFragmentSource(entry.frag);
+  setVertexSource(entry.vert);
+  doCompile();
 });
 
 // ── Split-pane drag ────────────────────────────────────
@@ -355,6 +486,7 @@ function renderProjectGrid() {
       e.stopPropagation();
       if (all.length <= 1) return;
       if (confirm(`Delete "${p.name}"?`)) {
+        clearHistory(p.id);
         deleteProject(p.id);
         renderProjectGrid();
       }
@@ -649,8 +781,8 @@ document.getElementById('extract-save-btn').addEventListener('click', () => {
   closeExtractModal();
   renderPatternList();
 
-  // Switch to patterns tab to show the new item
-  document.querySelector('.sidebar-tab[data-sidebar="patterns"]').click();
+  // Open the patterns drawer to show the newly saved pattern
+  openDrawer();
 });
 
 // ── Dep modal ──────────────────────────────────────────
