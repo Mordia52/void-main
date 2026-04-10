@@ -23,7 +23,7 @@ export function initRenderer(canvasEl) {
   camera = new THREE.PerspectiveCamera(60, 1, 0.01, 100);
   camera.position.set(0, 0, 2.6);
 
-  renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true });
+  renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
   builtinUniforms = {

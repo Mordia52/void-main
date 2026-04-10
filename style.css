@@ -402,6 +402,181 @@ button {
   text-align: center;
 }
 
+/* ── Project button (toolbar) ─────────────────────── */
+
+.project-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  max-width: 180px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.project-btn:hover  { border-color: var(--accent-dim); }
+#project-name-display {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.dirty-dot   { color: var(--accent); font-size: 10px; flex-shrink: 0; }
+.project-chevron { color: var(--text-muted); font-size: 10px; flex-shrink: 0; }
+
+/* ── Project modal ────────────────────────────────── */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(2px);
+}
+
+.modal-panel {
+  position: relative;
+  z-index: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: min(860px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.modal-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+  letter-spacing: 0.02em;
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.modal-close:hover { color: var(--text); background: var(--surface3); }
+
+/* ── Project grid ─────────────────────────────────── */
+
+#project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  padding: 18px;
+  overflow-y: auto;
+}
+
+.project-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+  position: relative;
+}
+.project-card:hover           { border-color: var(--accent-dim); transform: translateY(-1px); }
+.project-card.active          { border-color: var(--accent); }
+.project-card.active::after   {
+  content: '●';
+  position: absolute;
+  top: 8px; right: 8px;
+  color: var(--accent);
+  font-size: 9px;
+  text-shadow: 0 0 6px var(--accent);
+}
+
+.project-thumb {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: var(--surface3);
+}
+
+.project-info {
+  padding: 9px 10px 6px;
+}
+
+.project-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  outline: none;
+  border-radius: 3px;
+  padding: 1px 3px;
+  margin: -1px -3px;
+}
+.project-name[contenteditable="true"] {
+  background: var(--surface3);
+  color: var(--accent);
+  white-space: normal;
+  overflow: visible;
+}
+
+.project-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.project-actions {
+  display: flex;
+  gap: 4px;
+  padding: 0 8px 8px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.project-card:hover .project-actions { opacity: 1; }
+
+.project-action-btn {
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.project-action-btn:hover        { color: var(--text); border-color: var(--accent-dim); }
+.project-action-btn.danger:hover { color: var(--error); border-color: var(--error); }
+
 /* ── Utility ──────────────────────────────────────── */
 
 .hidden { display: none !important; }

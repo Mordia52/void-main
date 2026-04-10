@@ -69,33 +69,42 @@ const crucibleTheme = EditorView.theme({
 }, { dark: true });
 
 // ── Editor factory ─────────────────────────────────────
-function makeEditor(doc, parent) {
+function makeEditor(doc, parent, fireOnChange = false) {
+  const extensions = [
+    lineNumbers(),
+    highlightActiveLine(),
+    highlightActiveLineGutter(),
+    drawSelection(),
+    bracketMatching(),
+    indentOnInput(),
+    glslLang,
+    syntaxHighlighting(defaultHighlightStyle),
+    crucibleTheme,
+    errorLineField,
+    keymap.of([...defaultKeymap, indentWithTab]),
+  ];
+
+  if (fireOnChange) {
+    extensions.push(EditorView.updateListener.of(update => {
+      if (update.docChanged && _onChange) _onChange();
+    }));
+  }
+
   return new EditorView({
-    state: EditorState.create({
-      doc,
-      extensions: [
-        lineNumbers(),
-        highlightActiveLine(),
-        highlightActiveLineGutter(),
-        drawSelection(),
-        bracketMatching(),
-        indentOnInput(),
-        glslLang,
-        syntaxHighlighting(defaultHighlightStyle),
-        crucibleTheme,
-        errorLineField,
-        keymap.of([...defaultKeymap, indentWithTab]),
-      ],
-    }),
+    state: EditorState.create({ doc, extensions }),
     parent,
   });
 }
 
 let fragEditor, vertEditor;
+let _onChange = null;
+
+/** Register a callback fired whenever the fragment editor content changes. */
+export function setOnChange(cb) { _onChange = cb; }
 
 export function initEditor({ fragContainer, vertContainer }) {
-  fragEditor = makeEditor(DEFAULT_FRAG, fragContainer);
-  vertEditor = makeEditor(DEFAULT_VERT, vertContainer);
+  fragEditor = makeEditor(DEFAULT_FRAG, fragContainer, true);
+  vertEditor = makeEditor(DEFAULT_VERT, vertContainer, false);
 }
 
 export function getFragmentSource() { return fragEditor.state.doc.toString(); }

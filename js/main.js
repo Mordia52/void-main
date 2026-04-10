@@ -1,24 +1,62 @@
 import { initRenderer, resize as rendererResize, resetCamera,
          setGeometry, setMaterial, setMousePos,
-         getBuiltinUniforms, getGLContext }             from './renderer.js';
+         getBuiltinUniforms, getGLContext }                      from './renderer.js';
 import { initEditor, getFragmentSource, getVertexSource,
          setFragmentSource, setVertexSource,
-         showError, clearErrors }                        from './editor.js';
-import { compile, extractUniforms }                     from './compiler.js';
-import { buildThreeUniforms, buildControls }            from './uniforms.js';
-import { PRESETS }                                      from './presets.js';
+         showError, clearErrors, setOnChange }                   from './editor.js';
+import { compile, extractUniforms }                              from './compiler.js';
+import { buildThreeUniforms, buildControls }                     from './uniforms.js';
+import { PRESETS, DEFAULT_FRAG, DEFAULT_VERT }                   from './presets.js';
+import { initProjects, setDefaults, getActive, getAll,
+         createProject, duplicateProject, renameProject,
+         deleteProject, switchTo, autoSave, markDirty,
+         projectColor, relativeTime }                            from './projects.js';
+
+// ── DOM refs ───────────────────────────────────────────
+
+const canvas          = document.getElementById('gl-canvas');
+const fragHost        = document.getElementById('cm-fragment');
+const vertHost        = document.getElementById('cm-vertex');
+const errorPanel      = document.getElementById('error-panel');
+const errorContent    = document.getElementById('error-content');
+const uniformControls = document.getElementById('uniform-controls');
+const projectModal    = document.getElementById('project-modal');
+const projectGrid     = document.getElementById('project-grid');
+const geoSelect       = document.getElementById('geometry-select');
+
+// ── State ──────────────────────────────────────────────
+
+let currentGeometry = 'box';
 
 // ── Bootstrap ──────────────────────────────────────────
 
-const canvas         = document.getElementById('gl-canvas');
-const fragHost       = document.getElementById('cm-fragment');
-const vertHost       = document.getElementById('cm-vertex');
-const errorPanel     = document.getElementById('error-panel');
-const errorContent   = document.getElementById('error-content');
-const uniformControls = document.getElementById('uniform-controls');
-
 initRenderer(canvas);
 initEditor({ fragContainer: fragHost, vertContainer: vertHost });
+
+// Feed defaults so projects.js can init new projects with the right shader
+setDefaults(DEFAULT_FRAG, DEFAULT_VERT);
+
+// Mark dirty whenever the editor content changes
+setOnChange(markDirty);
+
+// Init projects — fires onSwitch immediately with the active project
+const activeOnLoad = initProjects(loadProject);
+
+// Load active project into editor (overrides initEditor defaults if needed)
+loadProject(activeOnLoad);
+
+// ── Project loading ────────────────────────────────────
+
+function loadProject(p) {
+  setFragmentSource(p.frag);
+  setVertexSource(p.vert);
+  currentGeometry = p.geometry ?? 'box';
+  geoSelect.value = currentGeometry;
+  setGeometry(currentGeometry);
+  clearErrors();
+  errorPanel.classList.add('hidden');
+  doCompile();
+}
 
 // ── Compile pipeline ───────────────────────────────────
 
@@ -28,8 +66,7 @@ function doCompile() {
   const fragSrc = getFragmentSource();
   const vertSrc = getVertexSource();
 
-  // Extract and build Three.js uniform objects for custom uniforms
-  const detected    = extractUniforms(fragSrc);
+  const detected     = extractUniforms(fragSrc);
   const userUniforms = buildThreeUniforms(detected);
 
   const result = compile({
@@ -48,24 +85,40 @@ function doCompile() {
     return;
   }
 
-  // Success
   errorPanel.classList.add('hidden');
   setMaterial(result.material);
-
-  // Build sidebar controls, wired live to material.uniforms
   buildControls(detected, result.material.uniforms, uniformControls);
+
+  // Capture thumbnail after two frames so the new shader has rendered
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    autoSave({
+      frag:      fragSrc,
+      vert:      vertSrc,
+      geometry:  currentGeometry,
+      thumbnail: captureThumb(),
+    });
+    renderProjectGrid(); // refresh cards if modal is open
+  }));
 }
 
 document.getElementById('compile-btn').addEventListener('click', doCompile);
-
 document.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-    e.preventDefault();
-    doCompile();
-  }
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); doCompile(); }
 });
 
-// ── Canvas error flash ─────────────────────────────────
+// ── Thumbnail ──────────────────────────────────────────
+
+function captureThumb() {
+  try {
+    const tmp = document.createElement('canvas');
+    tmp.width  = 240;
+    tmp.height = 135;
+    tmp.getContext('2d').drawImage(canvas, 0, 0, 240, 135);
+    return tmp.toDataURL('image/jpeg', 0.65);
+  } catch { return null; }
+}
+
+// ── Canvas flash ───────────────────────────────────────
 
 function flashCanvas() {
   canvas.classList.remove('flash');
@@ -78,11 +131,7 @@ function flashCanvas() {
 canvas.addEventListener('mousemove', e => {
   if (e.buttons === 0) return;
   const rect = canvas.getBoundingClientRect();
-  // Flip Y so origin is bottom-left (matches GLSL convention)
-  setMousePos(
-    e.clientX - rect.left,
-    canvas.clientHeight - (e.clientY - rect.top),
-  );
+  setMousePos(e.clientX - rect.left, canvas.clientHeight - (e.clientY - rect.top));
 });
 
 // ── Tabs ───────────────────────────────────────────────
@@ -99,8 +148,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 // ── Geometry switcher ──────────────────────────────────
 
-document.getElementById('geometry-select').addEventListener('change', e => {
-  setGeometry(e.target.value);
+geoSelect.addEventListener('change', e => {
+  currentGeometry = e.target.value;
+  setGeometry(currentGeometry);
+  markDirty();
 });
 
 // ── Preset dropdown ────────────────────────────────────
@@ -147,33 +198,26 @@ document.getElementById('close-error-btn').addEventListener('click', () => {
   const divider    = document.getElementById('divider');
   const editorPane = document.getElementById('editor-pane');
   const workspace  = document.getElementById('workspace');
-
   let dragging = false, startX = 0, startW = 0;
 
   divider.addEventListener('mousedown', e => {
-    dragging = true;
-    startX   = e.clientX;
-    startW   = editorPane.offsetWidth;
+    dragging = true; startX = e.clientX; startW = editorPane.offsetWidth;
     divider.classList.add('dragging');
-    document.body.style.cursor     = 'col-resize';
+    document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   });
-
   document.addEventListener('mousemove', e => {
     if (!dragging) return;
-    const total = workspace.offsetWidth;
-    const newW  = Math.max(220, Math.min(total - 220, startW + e.clientX - startX));
+    const newW = Math.max(220, Math.min(workspace.offsetWidth - 220, startW + e.clientX - startX));
     editorPane.style.width = newW + 'px';
     editorPane.style.flex  = 'none';
     rendererResize();
   });
-
   document.addEventListener('mouseup', () => {
     if (!dragging) return;
     dragging = false;
     divider.classList.remove('dragging');
-    document.body.style.cursor     = '';
-    document.body.style.userSelect = '';
+    document.body.style.cursor = document.body.style.userSelect = '';
     rendererResize();
   });
 })();
@@ -181,3 +225,108 @@ document.getElementById('close-error-btn').addEventListener('click', () => {
 // ── Canvas resize observer ─────────────────────────────
 
 new ResizeObserver(rendererResize).observe(canvas);
+
+// ── Project modal ──────────────────────────────────────
+
+function openProjectModal() {
+  renderProjectGrid();
+  projectModal.classList.remove('hidden');
+}
+
+function closeProjectModal() {
+  projectModal.classList.add('hidden');
+}
+
+document.getElementById('project-btn').addEventListener('click', openProjectModal);
+document.getElementById('project-modal-close').addEventListener('click', closeProjectModal);
+document.querySelector('.modal-backdrop').addEventListener('click', closeProjectModal);
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeProjectModal();
+});
+
+document.getElementById('new-project-btn').addEventListener('click', () => {
+  createProject('Untitled Shader');
+  closeProjectModal();
+});
+
+function renderProjectGrid() {
+  const all    = getAll();
+  const active = getActive();
+  projectGrid.innerHTML = '';
+
+  all.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'project-card' + (p.id === active.id ? ' active' : '');
+    card.dataset.id = p.id;
+
+    const thumb = document.createElement('div');
+    thumb.className = 'project-thumb';
+    thumb.style.background = p.thumbnail
+      ? `url(${p.thumbnail}) center/cover`
+      : projectColor(p.id);
+
+    const info = document.createElement('div');
+    info.className = 'project-info';
+
+    const nameEl = document.createElement('div');
+    nameEl.className     = 'project-name';
+    nameEl.textContent   = p.name;
+    nameEl.title         = 'Double-click to rename';
+    nameEl.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      nameEl.contentEditable = 'true';
+      nameEl.focus();
+      document.execCommand('selectAll', false, null);
+    });
+    nameEl.addEventListener('blur', () => {
+      nameEl.contentEditable = 'false';
+      renameProject(p.id, nameEl.textContent || p.name);
+    });
+    nameEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); nameEl.blur(); }
+      if (e.key === 'Escape') { nameEl.textContent = p.name; nameEl.blur(); }
+    });
+
+    const meta = document.createElement('div');
+    meta.className   = 'project-meta';
+    meta.textContent = relativeTime(p.modifiedAt);
+
+    const actions = document.createElement('div');
+    actions.className = 'project-actions';
+
+    const dupBtn = document.createElement('button');
+    dupBtn.className   = 'project-action-btn';
+    dupBtn.title       = 'Duplicate';
+    dupBtn.textContent = '⎘';
+    dupBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      duplicateProject(p.id);
+      renderProjectGrid();
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.className   = 'project-action-btn danger';
+    delBtn.title       = 'Delete';
+    delBtn.textContent = '✕';
+    delBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (all.length <= 1) return;
+      if (confirm(`Delete "${p.name}"?`)) {
+        deleteProject(p.id);
+        renderProjectGrid();
+      }
+    });
+
+    actions.append(dupBtn, delBtn);
+    info.append(nameEl, meta);
+    card.append(thumb, info, actions);
+
+    card.addEventListener('click', () => {
+      if (p.id !== getActive().id) switchTo(p.id);
+      closeProjectModal();
+    });
+
+    projectGrid.appendChild(card);
+  });
+}
