@@ -1,7 +1,7 @@
 import { EditorView, keymap, lineNumbers, drawSelection,
          highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view';
-import { EditorState, StateEffect, StateField }          from '@codemirror/state';
-import { defaultKeymap, indentWithTab }                   from '@codemirror/commands';
+import { EditorState, StateEffect, StateField, Transaction } from '@codemirror/state';
+import { defaultKeymap, indentWithTab, history, undo, redo } from '@codemirror/commands';
 import { StreamLanguage, syntaxHighlighting,
          defaultHighlightStyle, bracketMatching,
          indentOnInput }                                  from '@codemirror/language';
@@ -108,7 +108,13 @@ function makeEditor(doc, parent, fireOnChange = false) {
     crucibleTheme,
     errorLineField,
     dropLineField,
-    keymap.of([...defaultKeymap, indentWithTab]),
+    history(),
+    keymap.of([
+      { key: 'Mod-z', run: undo, preventDefault: true },
+      { key: 'Mod-y', run: redo, preventDefault: true },
+      ...defaultKeymap,
+      indentWithTab,
+    ]),
   ];
 
   if (fireOnChange) {
@@ -140,12 +146,14 @@ export function getVertexSource()   { return vertEditor.state.doc.toString(); }
 export function setFragmentSource(src) {
   fragEditor.dispatch({
     changes: { from: 0, to: fragEditor.state.doc.length, insert: src },
+    annotations: Transaction.addToHistory.of(false),
   });
 }
 
 export function setVertexSource(src) {
   vertEditor.dispatch({
     changes: { from: 0, to: vertEditor.state.doc.length, insert: src },
+    annotations: Transaction.addToHistory.of(false),
   });
 }
 
@@ -156,12 +164,14 @@ export function setVertexSource(src) {
 export function showError(lineNum) {
   fragEditor.dispatch({
     effects: setErrorLineEffect.of(lineNum ?? null),
+    annotations: Transaction.addToHistory.of(false),
   });
 }
 
 export function clearErrors() {
   fragEditor.dispatch({
     effects: setErrorLineEffect.of(null),
+    annotations: Transaction.addToHistory.of(false),
   });
 }
 
@@ -176,7 +186,10 @@ export function getSelection() {
  * Show or hide the drop-line indicator (1-based line number, or null to clear).
  */
 export function setDropLine(lineNum) {
-  fragEditor.dispatch({ effects: setDropLineEffect.of(lineNum ?? null) });
+  fragEditor.dispatch({
+    effects: setDropLineEffect.of(lineNum ?? null),
+    annotations: Transaction.addToHistory.of(false),
+  });
 }
 
 /**
