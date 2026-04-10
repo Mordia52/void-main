@@ -50,7 +50,8 @@ const ghostCloseBtn      = document.getElementById('ghost-close-btn');
 
 // ── State ──────────────────────────────────────────────
 
-let currentGeometry = 'box';
+let currentGeometry    = 'box';
+let activeGhostIndex   = -1;
 
 // ── Bootstrap ──────────────────────────────────────────
 
@@ -208,7 +209,7 @@ presetSelect.addEventListener('change', e => {
   const preset = PRESETS.find(p => p.name === e.target.value);
   if (!preset) return;
   clearErrors();
-  errorPanel.classList.add('hidden');
+  closeBottomPanel();
   setFragmentSource(preset.frag);
   if (preset.vert) setVertexSource(preset.vert);
   presetSelect.value = '';
@@ -262,8 +263,6 @@ document.getElementById('history-btn').addEventListener('click', () => {
 });
 
 // ── History filmstrip ───────────────────────────────────
-
-let activeGhostIndex = -1;
 
 function renderHistoryFilmstrip() {
   const entries = getHistory(getActive().id);
