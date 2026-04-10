@@ -31,7 +31,7 @@ const dropLineField = StateField.define({
       } else {
         try {
           const total = tr.state.doc.lines;
-          if (e.value > total) {
+          if (e.value >= total) {
             // Sentinel: "append after last line" — show borderBottom on last line
             const last = tr.state.doc.line(total);
             decs = Decoration.set([
@@ -294,8 +294,8 @@ export function insertAtLine(lineNum, text) {
   const { state } = fragEditor;
   let pos;
   try {
-    // Sentinel > doc.lines means "append to end of file"
-    if (lineNum > state.doc.lines) {
+    // Sentinel >= doc.lines means "append to end of file"
+    if (lineNum >= state.doc.lines) {
       pos = state.doc.length;
     } else {
       pos = state.doc.line(Math.max(1, lineNum)).from;
