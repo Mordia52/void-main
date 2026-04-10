@@ -13,6 +13,31 @@ import { DEFAULT_FRAG, DEFAULT_VERT } from './presets.js';
 // ── GLSL language ──────────────────────────────────────
 const glslLang = StreamLanguage.define(cLike);
 
+// ── Drop-line indicator decoration ────────────────────
+const setDropLineEffect = StateEffect.define();
+
+const dropLineField = StateField.define({
+  create: () => Decoration.none,
+  update(decs, tr) {
+    decs = decs.map(tr.changes);
+    for (const e of tr.effects) {
+      if (!e.is(setDropLineEffect)) continue;
+      if (e.value === null) {
+        decs = Decoration.none;
+      } else {
+        try {
+          const line = tr.state.doc.line(e.value);
+          decs = Decoration.set([
+            Decoration.line({ class: 'cm-drop-line' }).range(line.from),
+          ]);
+        } catch { decs = Decoration.none; }
+      }
+    }
+    return decs;
+  },
+  provide: f => EditorView.decorations.from(f),
+});
+
 // ── Error line decoration ──────────────────────────────
 const setErrorLineEffect = StateEffect.define();
 
@@ -66,6 +91,7 @@ const crucibleTheme = EditorView.theme({
   '&.cm-focused .cm-selectionBackground': { backgroundColor: '#1a3040' },
   '.cm-matchingBracket':  { color: '#00e5ff', fontWeight: 'bold', backgroundColor: 'transparent' },
   '.cm-error-line':        { backgroundColor: 'rgba(255,85,85,0.18) !important' },
+  '.cm-drop-line':         { backgroundColor: 'rgba(0,229,255,0.07) !important', borderTop: '2px solid #00e5ff' },
 }, { dark: true });
 
 // ── Editor factory ─────────────────────────────────────
@@ -81,6 +107,7 @@ function makeEditor(doc, parent, fireOnChange = false) {
     syntaxHighlighting(defaultHighlightStyle),
     crucibleTheme,
     errorLineField,
+    dropLineField,
     keymap.of([...defaultKeymap, indentWithTab]),
   ];
 
@@ -143,6 +170,24 @@ export function getSelection() {
   const { state } = fragEditor;
   const sel = state.selection.main;
   return sel.empty ? '' : state.sliceDoc(sel.from, sel.to);
+}
+
+/**
+ * Show or hide the drop-line indicator (1-based line number, or null to clear).
+ */
+export function setDropLine(lineNum) {
+  fragEditor.dispatch({ effects: setDropLineEffect.of(lineNum ?? null) });
+}
+
+/**
+ * Return the 1-based line number in the fragment editor at the given
+ * document coordinates (e.g. from a dragover event). Returns null if
+ * the coordinates are outside the editor.
+ */
+export function lineAtCoords(x, y) {
+  const pos = fragEditor.posAtCoords({ x, y }, false);
+  if (pos === null) return null;
+  return fragEditor.state.doc.lineAt(pos).number;
 }
 
 /**

@@ -4,7 +4,8 @@ import { initRenderer, resize as rendererResize, resetCamera,
 import { initEditor, getFragmentSource, getVertexSource,
          setFragmentSource, setVertexSource,
          showError, clearErrors, setOnChange,
-         getSelection, insertAtCursor, prependBeforeMain }       from './editor.js';
+         getSelection, insertAtCursor, prependBeforeMain,
+         setDropLine, lineAtCoords }                             from './editor.js';
 import { compile, extractUniforms }                              from './compiler.js';
 import { buildThreeUniforms, buildControls }                     from './uniforms.js';
 import { PRESETS, DEFAULT_FRAG, DEFAULT_VERT }                   from './presets.js';
@@ -26,11 +27,12 @@ const uniformControls = document.getElementById('uniform-controls');
 const projectModal    = document.getElementById('project-modal');
 const projectGrid     = document.getElementById('project-grid');
 const geoSelect       = document.getElementById('geometry-select');
-const patternList     = document.getElementById('pattern-list');
-const patternSearch   = document.getElementById('pattern-search');
+const patternList      = document.getElementById('pattern-list');
+const patternSearch    = document.getElementById('pattern-search');
 const patternCatFilter = document.getElementById('pattern-category-filter');
-const extractModal    = document.getElementById('extract-modal');
-const depModal        = document.getElementById('dep-modal');
+const patternDrawer    = document.getElementById('pattern-drawer');
+const extractModal     = document.getElementById('extract-modal');
+const depModal         = document.getElementById('dep-modal');
 
 // ── State ──────────────────────────────────────────────
 
@@ -372,16 +374,24 @@ function renderProjectGrid() {
   });
 }
 
-// ── Sidebar tabs ───────────────────────────────────────
+// ── Pattern drawer toggle ──────────────────────────────
 
-document.querySelectorAll('.sidebar-tab').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const target = btn.dataset.sidebar;
-    document.getElementById('uniform-sidebar').classList.toggle('hidden', target !== 'uniforms');
-    document.getElementById('pattern-sidebar').classList.toggle('hidden', target !== 'patterns');
-  });
+function openDrawer() {
+  patternDrawer.classList.remove('closed');
+  document.getElementById('patterns-btn').classList.add('active');
+}
+function closeDrawer() {
+  patternDrawer.classList.add('closed');
+  document.getElementById('patterns-btn').classList.remove('active');
+}
+
+document.getElementById('patterns-btn').addEventListener('click', () => {
+  patternDrawer.classList.contains('closed') ? openDrawer() : closeDrawer();
+});
+document.getElementById('pattern-drawer-close').addEventListener('click', closeDrawer);
+
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'l') { e.preventDefault(); openDrawer(); }
 });
 
 // ── Pattern sidebar ────────────────────────────────────
@@ -478,13 +488,25 @@ function renderPatternList() {
       card.prepend(top);
       card.appendChild(actions);
 
-      // Drag
+      // Drag — custom ghost card
       card.addEventListener('dragstart', e => {
         e.dataTransfer.setData('text/plain', p.id);
         e.dataTransfer.effectAllowed = 'copy';
         card.classList.add('dragging');
+
+        const ghost = document.createElement('div');
+        ghost.className = 'drag-ghost';
+        ghost.innerHTML =
+          `<span class="drag-ghost-name">${p.name}</span>` +
+          `<span class="drag-ghost-cat">${p.category}</span>`;
+        document.body.appendChild(ghost);
+        e.dataTransfer.setDragImage(ghost, 24, 24);
+        requestAnimationFrame(() => ghost.remove());
       });
-      card.addEventListener('dragend', () => card.classList.remove('dragging'));
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        setDropLine(null);
+      });
 
       patternList.appendChild(card);
     });
@@ -508,15 +530,23 @@ function insertPattern(p) {
 // ── Editor drag-drop receive ───────────────────────────
 
 const editorContainer = document.getElementById('editor-container');
+
 editorContainer.addEventListener('dragover', e => {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'copy';
+  const line = lineAtCoords(e.clientX, e.clientY);
+  setDropLine(line);
 });
+
+editorContainer.addEventListener('dragleave', e => {
+  if (!editorContainer.contains(e.relatedTarget)) setDropLine(null);
+});
+
 editorContainer.addEventListener('drop', e => {
   e.preventDefault();
+  setDropLine(null);
   const id = e.dataTransfer.getData('text/plain');
   if (!id) return;
-  const { getPatternById } = { getPatternById: (i) => getPatterns().find(p => p.id === i) };
   const p = getPatterns().find(pt => pt.id === id);
   if (p) insertPattern(p);
 });

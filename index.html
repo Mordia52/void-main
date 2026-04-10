@@ -45,6 +45,7 @@
     </div>
 
     <div class="toolbar-right">
+      <button id="patterns-btn" class="btn-secondary" title="Pattern Library (Ctrl+L)">◧ Patterns</button>
       <select id="geometry-select">
         <option value="quad">Fullscreen Quad</option>
         <option value="sphere">Sphere</option>
@@ -52,13 +53,30 @@
         <option value="plane">Plane</option>
         <option value="torus">Torus</option>
       </select>
-      <button id="compile-btn"         class="btn-primary">Compile ▶</button>
-      <button id="reset-camera-btn"    class="btn-secondary">Reset</button>
+      <button id="compile-btn"      class="btn-primary">Compile ▶</button>
+      <button id="reset-camera-btn" class="btn-secondary">Reset</button>
     </div>
   </div>
 
   <!-- ── Workspace ───────────────────────────────── -->
   <div id="workspace">
+
+    <!-- Pattern Library drawer (floats over editor) -->
+    <div id="pattern-drawer" class="closed">
+      <div class="drawer-header">
+        <span class="drawer-title">Pattern Library</span>
+        <button id="extract-pattern-btn" class="btn-secondary" title="Extract selection (Ctrl+E)">+ Extract</button>
+        <button id="pattern-drawer-close" class="drawer-close">✕</button>
+      </div>
+      <div class="drawer-filters">
+        <input id="pattern-search" type="text" placeholder="Search…" autocomplete="off" />
+        <select id="pattern-category-filter">
+          <option value="">All categories</option>
+        </select>
+      </div>
+      <div id="pattern-list"></div>
+      <div class="drawer-drop-hint">Drop zone — drag a card into the editor</div>
+    </div>
 
     <!-- Left: editor + error panel -->
     <div id="editor-pane">
@@ -77,32 +95,13 @@
 
     <div id="divider"></div>
 
-    <!-- Right: canvas + tabbed sidebar -->
+    <!-- Right: canvas + uniform sidebar -->
     <div id="canvas-pane">
       <canvas id="gl-canvas"></canvas>
-      <div id="right-sidebar">
-        <div class="sidebar-tabs">
-          <button class="sidebar-tab active" data-sidebar="uniforms">Uniforms</button>
-          <button class="sidebar-tab"        data-sidebar="patterns">Patterns</button>
-        </div>
-
-        <!-- Uniforms panel -->
-        <div id="uniform-sidebar" class="sidebar-panel">
-          <div id="uniform-controls">
-            <p class="sidebar-hint">Compile a shader to auto-detect uniforms.</p>
-          </div>
-        </div>
-
-        <!-- Patterns panel -->
-        <div id="pattern-sidebar" class="sidebar-panel hidden">
-          <div class="pattern-toolbar">
-            <input id="pattern-search" type="text" placeholder="Search patterns…" autocomplete="off" />
-            <select id="pattern-category-filter">
-              <option value="">All categories</option>
-            </select>
-            <button id="extract-pattern-btn" class="btn-secondary" title="Extract selection as Pattern (Ctrl+E)">+ Extract</button>
-          </div>
-          <div id="pattern-list"></div>
+      <div id="uniform-sidebar">
+        <div class="sidebar-header">Uniforms</div>
+        <div id="uniform-controls">
+          <p class="sidebar-hint">Compile a shader to auto-detect uniforms.</p>
         </div>
       </div>
     </div>
@@ -147,7 +146,7 @@
         <button class="modal-close" id="dep-modal-close">✕</button>
       </div>
       <div class="dep-body">
-        <p class="sidebar-hint">This pattern requires the following helpers that aren't in your shader yet:</p>
+        <p class="sidebar-hint">This pattern requires helpers not yet in your shader:</p>
         <ul id="dep-list"></ul>
         <div class="extract-actions">
           <button id="dep-skip-btn"   class="btn-secondary">Insert without deps</button>
