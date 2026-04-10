@@ -1,13 +1,12 @@
 import { EditorView, keymap, lineNumbers, drawSelection,
          highlightActiveLine, highlightActiveLineGutter,
-         highlightSpecialChars, dropCursor,
+         highlightSpecialChars,
          rectangularSelection, crosshairCursor,
          Decoration }                                     from '@codemirror/view';
 import { EditorState, StateEffect, StateField, Transaction } from '@codemirror/state';
 import { defaultKeymap, indentWithTab, history, undo, redo } from '@codemirror/commands';
 import { StreamLanguage, syntaxHighlighting,
-         bracketMatching, indentOnInput,
-         foldGutter }                                     from '@codemirror/language';
+         bracketMatching, indentOnInput }                 from '@codemirror/language';
 import { closeBrackets }                                  from '@codemirror/autocomplete';
 import { searchKeymap, highlightSelectionMatches,
          selectNextOccurrence }                           from '@codemirror/search';
@@ -151,20 +150,17 @@ function makeEditor(doc, parent, fireOnChange = false) {
     highlightActiveLine(),
     highlightActiveLineGutter(),
     drawSelection(),
-    dropCursor(),
     rectangularSelection(),
     crosshairCursor(),
     bracketMatching(),
     closeBrackets(),
     indentOnInput(),
-    foldGutter(),
     glslLang,
     syntaxHighlighting(oneDarkHighlightStyle),
     highlightSelectionMatches(),
     crucibleTheme,
     errorLineField,
     dropLineField,
-    EditorView.lineWrapping,
     history(),
     keymap.of([
       { key: 'Mod-z', run: undo, preventDefault: true },
