@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crucible — GLSL Playground</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three":                                    "https://esm.sh/three@0.162.0",
+      "codemirror":                               "https://esm.sh/codemirror@6.0.1",
+      "@codemirror/view":                         "https://esm.sh/@codemirror/view@6",
+      "@codemirror/state":                        "https://esm.sh/@codemirror/state@6",
+      "@codemirror/language":                     "https://esm.sh/@codemirror/language@6",
+      "@codemirror/commands":                     "https://esm.sh/@codemirror/commands@6",
+      "@codemirror/legacy-modes/mode/clike":      "https://esm.sh/@codemirror/legacy-modes@0/mode/clike"
+    }
+  }
+  </script>
+</head>
+<body>
+
+  <!-- ── Toolbar ─────────────────────────────────── -->
+  <div id="toolbar">
+    <div class="toolbar-left">
+      <span class="logo">◈ Crucible</span>
+      <select id="preset-select">
+        <option value="">— Presets —</option>
+      </select>
+    </div>
+
+    <div class="toolbar-center">
+      <div id="editor-tabs">
+        <button class="tab-btn active" data-tab="fragment">Fragment</button>
+        <button class="tab-btn"        data-tab="vertex">Vertex</button>
+      </div>
+    </div>
+
+    <div class="toolbar-right">
+      <select id="geometry-select">
+        <option value="quad">Fullscreen Quad</option>
+        <option value="sphere">Sphere</option>
+        <option value="box" selected>Box</option>
+        <option value="plane">Plane</option>
+        <option value="torus">Torus</option>
+      </select>
+      <button id="compile-btn"         class="btn-primary">Compile ▶</button>
+      <button id="reset-camera-btn"    class="btn-secondary">Reset</button>
+      <button id="toggle-uniforms-btn" class="btn-secondary">Uniforms</button>
+    </div>
+  </div>
+
+  <!-- ── Workspace ───────────────────────────────── -->
+  <div id="workspace">
+
+    <!-- Left: editor + error panel -->
+    <div id="editor-pane">
+      <div id="editor-container">
+        <div id="cm-fragment" class="cm-host"></div>
+        <div id="cm-vertex"   class="cm-host hidden"></div>
+      </div>
+      <div id="error-panel" class="hidden">
+        <div class="error-header">
+          <span>Errors</span>
+          <button id="close-error-btn">✕</button>
+        </div>
+        <pre id="error-content"></pre>
+      </div>
+    </div>
+
+    <div id="divider"></div>
+
+    <!-- Right: canvas + uniform sidebar -->
+    <div id="canvas-pane">
+      <canvas id="gl-canvas"></canvas>
+      <div id="uniform-sidebar">
+        <div class="sidebar-header">Uniforms</div>
+        <div id="uniform-controls">
+          <p class="sidebar-hint">Compile a shader to auto-detect uniforms.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
