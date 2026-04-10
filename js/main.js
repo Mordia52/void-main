@@ -5,7 +5,7 @@ import { initEditor, getFragmentSource, getVertexSource,
          setFragmentSource, setVertexSource,
          showError, clearErrors, setOnChange,
          getSelection, insertAtCursor, prependBeforeMain,
-         setDropLine, lineAtCoords }                             from './editor.js';
+         insertAtLine, setDropLine, lineAtCoords }               from './editor.js';
 import { compile, extractUniforms }                              from './compiler.js';
 import { buildThreeUniforms, buildControls }                     from './uniforms.js';
 import { PRESETS, DEFAULT_FRAG, DEFAULT_VERT }                   from './presets.js';
@@ -378,11 +378,15 @@ function renderProjectGrid() {
 
 function openDrawer() {
   patternDrawer.classList.remove('closed');
+  document.getElementById('workspace').classList.add('drawer-open');
   document.getElementById('patterns-btn').classList.add('active');
+  rendererResize();
 }
 function closeDrawer() {
   patternDrawer.classList.add('closed');
+  document.getElementById('workspace').classList.remove('drawer-open');
   document.getElementById('patterns-btn').classList.remove('active');
+  rendererResize();
 }
 
 document.getElementById('patterns-btn').addEventListener('click', () => {
@@ -488,11 +492,15 @@ function renderPatternList() {
       card.prepend(top);
       card.appendChild(actions);
 
-      // Drag — custom ghost card
+      // Drag — custom ghost, overlay intercepts so CM can't handle the drop
       card.addEventListener('dragstart', e => {
-        e.dataTransfer.setData('text/plain', p.id);
+        activeDragPattern = p;
+        // Use a non-text type so CM doesn't insert anything on drop
+        e.dataTransfer.setData('application/x-deepsight-pattern', p.id);
         e.dataTransfer.effectAllowed = 'copy';
         card.classList.add('dragging');
+
+        dragOverlay.classList.add('active');
 
         const ghost = document.createElement('div');
         ghost.className = 'drag-ghost';
@@ -505,6 +513,8 @@ function renderPatternList() {
       });
       card.addEventListener('dragend', () => {
         card.classList.remove('dragging');
+        activeDragPattern = null;
+        dragOverlay.classList.remove('active');
         setDropLine(null);
       });
 
@@ -515,40 +525,69 @@ function renderPatternList() {
 
 // ── Insert pattern ─────────────────────────────────────
 
-function insertPattern(p) {
+let _pendingDropLine = null;
+
+function insertPattern(p, line = null) {
   incrementUsed(p.id);
   const src     = getFragmentSource();
   const missing = missingDeps(p.deps, src);
 
   if (missing.length > 0) {
+    _pendingDropLine = line;
     openDepModal(missing, p);
   } else {
-    prependBeforeMain(p.code);
+    line ? insertAtLine(line, p.code) : prependBeforeMain(p.code);
   }
 }
 
-// ── Editor drag-drop receive ───────────────────────────
+// ── Drag state + overlay ───────────────────────────────
+// The overlay sits on top of CodeMirror so CM never sees the drop event,
+// preventing it from inserting the drag data as plain text.
 
-const editorContainer = document.getElementById('editor-container');
+let activeDragPattern = null;
+let dropLineNum       = null;
 
-editorContainer.addEventListener('dragover', e => {
+const dragOverlay = document.createElement('div');
+dragOverlay.id = 'pattern-drag-overlay';
+document.getElementById('editor-container').appendChild(dragOverlay);
+
+dragOverlay.addEventListener('dragover', e => {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'copy';
   const line = lineAtCoords(e.clientX, e.clientY);
+  dropLineNum = line;
   setDropLine(line);
 });
 
-editorContainer.addEventListener('dragleave', e => {
-  if (!editorContainer.contains(e.relatedTarget)) setDropLine(null);
+dragOverlay.addEventListener('dragleave', e => {
+  if (!dragOverlay.contains(e.relatedTarget)) {
+    setDropLine(null);
+    dropLineNum = null;
+  }
 });
 
-editorContainer.addEventListener('drop', e => {
+dragOverlay.addEventListener('drop', e => {
   e.preventDefault();
+  dragOverlay.classList.remove('active');
   setDropLine(null);
-  const id = e.dataTransfer.getData('text/plain');
-  if (!id) return;
-  const p = getPatterns().find(pt => pt.id === id);
-  if (p) insertPattern(p);
+
+  const p = activeDragPattern;
+  activeDragPattern = null;
+  if (!p) return;
+
+  const line = dropLineNum;
+  dropLineNum = null;
+
+  const src     = getFragmentSource();
+  const missing = missingDeps(p.deps, src);
+
+  if (missing.length > 0) {
+    // Store drop line so dep modal can use it
+    _pendingDropLine = line;
+    openDepModal(missing, p);
+  } else {
+    line ? insertAtLine(line, p.code) : prependBeforeMain(p.code);
+  }
 });
 
 // ── Extract pattern modal ──────────────────────────────
@@ -639,16 +678,21 @@ function closeDepModal() {
 document.getElementById('dep-modal-close').addEventListener('click', closeDepModal);
 
 document.getElementById('dep-skip-btn').addEventListener('click', () => {
-  if (_pendingInsert) prependBeforeMain(_pendingInsert.pattern.code);
+  if (_pendingInsert) {
+    const line = _pendingDropLine;
+    _pendingDropLine = null;
+    line ? insertAtLine(line, _pendingInsert.pattern.code)
+         : prependBeforeMain(_pendingInsert.pattern.code);
+  }
   closeDepModal();
 });
 
 document.getElementById('dep-insert-btn').addEventListener('click', () => {
   if (!_pendingInsert) return;
   const { missing, pattern } = _pendingInsert;
-  // Insert deps in dependency order, then the pattern itself
-  const toInsert = [...missing, pattern];
-  const block = toInsert.map(p => p.code).join('\n\n');
-  prependBeforeMain(block);
+  const block = [...missing, pattern].map(p => p.code).join('\n\n');
+  const line  = _pendingDropLine;
+  _pendingDropLine = null;
+  line ? insertAtLine(line, block) : prependBeforeMain(block);
   closeDepModal();
 });

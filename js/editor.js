@@ -210,15 +210,36 @@ export function insertAtCursor(text, prependNewline = true) {
 }
 
 /**
- * Prepend text before the first non-uniform, non-whitespace line
- * (i.e. just before void main). Good for inserting helper functions.
+ * Insert text at a specific 1-based line number in the fragment editor.
+ * Ensures clean newlines around the inserted block.
+ */
+export function insertAtLine(lineNum, text) {
+  const { state } = fragEditor;
+  let pos;
+  try {
+    pos = state.doc.line(Math.max(1, lineNum)).from;
+  } catch {
+    pos = state.doc.length;
+  }
+  const before     = pos > 0 ? state.sliceDoc(pos - 1, pos) : '\n';
+  const leadNewline = before !== '\n' ? '\n' : '';
+  const insert      = leadNewline + text.trim() + '\n\n';
+  fragEditor.dispatch({ changes: { from: pos, insert } });
+  fragEditor.focus();
+}
+
+/**
+ * Prepend text just before void main(). Good for inserting helper functions.
+ * Ensures clean newlines so code never concatenates with adjacent lines.
  */
 export function prependBeforeMain(text) {
   const src    = fragEditor.state.doc.toString();
   const mainRe = /^void\s+main\s*\(/m;
   const match  = mainRe.exec(src);
-  const pos    = match ? match.index : 0;
-  const insert = text + '\n\n';
+  const pos    = match ? match.index : src.length;
+  const before     = pos > 0 ? src[pos - 1] : '\n';
+  const leadNewline = before !== '\n' ? '\n' : '';
+  const insert = leadNewline + text.trim() + '\n\n';
   fragEditor.dispatch({ changes: { from: pos, insert } });
   fragEditor.focus();
 }

@@ -158,7 +158,18 @@ button {
   transform: translateX(-100%);
   box-shadow: none;
 }
+
 #workspace { position: relative; }
+
+/* Push the editor pane right when the drawer is open */
+#workspace.drawer-open #editor-pane {
+  margin-left: 300px;
+  transition: margin-left 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#workspace:not(.drawer-open) #editor-pane {
+  margin-left: 0;
+  transition: margin-left 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
 .drawer-header {
   display: flex;
@@ -375,6 +386,17 @@ button {
   overflow-y: auto;
   padding: 6px 0;
 }
+
+/* ── Pattern drag overlay (sits above CM, intercepts drop) ── */
+
+#pattern-drag-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: none;
+  cursor: copy;
+}
+#pattern-drag-overlay.active { display: block; }
 
 /* ── CM drop-line indicator ───────────────────────── */
 
