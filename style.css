@@ -353,18 +353,34 @@ button {
 }
 #pattern-drag-overlay.active { display: block; }
 
-/* ── CM drop-line indicator ───────────────────────── */
+/* ── CM drop-line indicators ──────────────────────── */
 
+/* Insert BEFORE this line (borderTop = insertion cursor above the line) */
 .cm-drop-line {
   border-top: 2px solid var(--accent) !important;
   position: relative;
 }
-/* Small circle at the left edge — looks like a proper insertion-cursor marker */
 .cm-drop-line::before {
   content: '';
   position: absolute;
   left: -4px;
   top: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* Append AFTER last line (borderBottom = insertion cursor below the line) */
+.cm-drop-line-after {
+  border-bottom: 2px solid var(--accent) !important;
+  position: relative;
+}
+.cm-drop-line-after::after {
+  content: '';
+  position: absolute;
+  left: -4px;
+  bottom: -5px;
   width: 8px;
   height: 8px;
   border-radius: 50%;
