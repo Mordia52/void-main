@@ -1,7 +1,6 @@
-import { EditorView, keymap, lineNumbers, drawSelection,
+import { EditorView, keymap, lineNumbers,
          highlightActiveLine, highlightActiveLineGutter,
          highlightSpecialChars,
-         rectangularSelection, crosshairCursor,
          Decoration }                                     from '@codemirror/view';
 import { EditorState, StateEffect, StateField, Transaction } from '@codemirror/state';
 import { defaultKeymap, indentWithTab, history, undo, redo } from '@codemirror/commands';
@@ -89,7 +88,7 @@ const crucibleTheme = EditorView.theme({
     borderRight: '1px solid #2a2a35',
     minWidth: '44px',
   },
-  '.cm-lineNumbers .cm-gutterElement': { padding: '0 14px 0 8px' },
+  '.cm-lineNumbers .cm-gutterElement': { padding: '0 6px 0 6px' },
   '.cm-activeLineGutter': { backgroundColor: '#161619', color: '#6a6a80' },
   '.cm-activeLine':        { backgroundColor: '#161619' },
   '.cm-selectionBackground':           { backgroundColor: '#1a3040' },
@@ -149,9 +148,6 @@ function makeEditor(doc, parent, fireOnChange = false) {
     highlightSpecialChars(),
     highlightActiveLine(),
     highlightActiveLineGutter(),
-    drawSelection(),
-    rectangularSelection(),
-    crosshairCursor(),
     bracketMatching(),
     closeBrackets(),
     indentOnInput(),
