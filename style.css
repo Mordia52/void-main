@@ -530,6 +530,12 @@ button {
   padding: 9px 10px 6px;
 }
 
+.project-name-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .project-name {
   font-size: 12px;
   font-weight: 500;
@@ -537,16 +543,30 @@ button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  outline: none;
-  border-radius: 3px;
-  padding: 1px 3px;
-  margin: -1px -3px;
+  flex: 1;
+  min-width: 0;
 }
-.project-name[contenteditable="true"] {
+
+.project-rename-btn {
+  opacity: 0;
+  flex-shrink: 0;
+  padding: 1px 5px;
+  font-size: 13px;
+  transition: opacity 0.15s;
+}
+.project-card:hover .project-rename-btn { opacity: 1; }
+
+.project-name-input {
+  flex: 1;
+  min-width: 0;
   background: var(--surface3);
   color: var(--accent);
-  white-space: normal;
-  overflow: visible;
+  border: 1px solid var(--accent-dim);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 1px 5px;
+  outline: none;
 }
 
 .project-meta {

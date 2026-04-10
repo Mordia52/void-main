@@ -269,24 +269,45 @@ function renderProjectGrid() {
     const info = document.createElement('div');
     info.className = 'project-info';
 
+    const nameRow = document.createElement('div');
+    nameRow.className = 'project-name-row';
+
     const nameEl = document.createElement('div');
-    nameEl.className     = 'project-name';
-    nameEl.textContent   = p.name;
-    nameEl.title         = 'Double-click to rename';
-    nameEl.addEventListener('dblclick', e => {
+    nameEl.className   = 'project-name';
+    nameEl.textContent = p.name;
+
+    const editBtn = document.createElement('button');
+    editBtn.className   = 'project-action-btn project-rename-btn';
+    editBtn.title       = 'Rename';
+    editBtn.textContent = '✎';
+
+    function startRename(e) {
       e.stopPropagation();
-      nameEl.contentEditable = 'true';
-      nameEl.focus();
-      document.execCommand('selectAll', false, null);
-    });
-    nameEl.addEventListener('blur', () => {
-      nameEl.contentEditable = 'false';
-      renameProject(p.id, nameEl.textContent || p.name);
-    });
-    nameEl.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); nameEl.blur(); }
-      if (e.key === 'Escape') { nameEl.textContent = p.name; nameEl.blur(); }
-    });
+      const current = nameEl.textContent;
+      const input = document.createElement('input');
+      input.className = 'project-name-input';
+      input.value     = current;
+      nameEl.replaceWith(input);
+      editBtn.style.display = 'none';
+      input.focus();
+      input.select();
+
+      function commit() {
+        const val = input.value.trim() || current;
+        renameProject(p.id, val);
+        input.replaceWith(nameEl);
+        nameEl.textContent    = val;
+        editBtn.style.display = '';
+      }
+
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', e2 => {
+        if (e2.key === 'Enter')  { e2.preventDefault(); input.blur(); }
+        if (e2.key === 'Escape') { input.value = current; input.blur(); }
+      });
+    }
+
+    editBtn.addEventListener('click', startRename);
 
     const meta = document.createElement('div');
     meta.className   = 'project-meta';
@@ -318,8 +339,9 @@ function renderProjectGrid() {
       }
     });
 
+    nameRow.append(nameEl, editBtn);
     actions.append(dupBtn, delBtn);
-    info.append(nameEl, meta);
+    info.append(nameRow, meta);
     card.append(thumb, info, actions);
 
     card.addEventListener('click', () => {
